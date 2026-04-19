@@ -24,9 +24,7 @@
           inherit system;
         };
 
-        inherit (pkgs) lib;
-
-        gimp = pkgs.gimp3;
+        inherit (pkgs) lib gimp gimp-with-plugins;
 
         mkNixPak = nixpak.lib.nixpak {
           inherit pkgs lib;
@@ -36,13 +34,13 @@
           (pkgs.fetchFromGitHub {
             owner = "Diolinux";
             repo = "PhotoGIMP";
-            rev = "af558b2889cd504fb4ed3db06c014cf36a4c8720";
-            sha256 = "sha256-OLEqtI2Hem2fTTL0KNf0aZsFfuwwhgE4etyRMcW5KiQ=";
+            rev = "62c6e3733a580b9754257ebe21d34ca5b366626d";
+            sha256 = "sha256-7mqJt99O4LLyPVdyK0BGbr0GTASXogMsP1pTLLYfXsw=";
           }).outPath;
 
         desktopItem = pkgs.makeDesktopItem (import ./desktopFile.nix photo-gimp-files);
 
-        gimp-wrapper = import ./photo-gimp-install-wrapper.nix {
+        g-wrapper = import ./photo-gimp-install-wrapper.nix {
           inherit
             pkgs
             lib
@@ -51,50 +49,42 @@
             ;
         };
 
-        nixpak-wrapper = (mkNixPak (import ./nixPak.nix gimp-wrapper)).config.script;
+        nixpak-wrapper-g = (mkNixPak (import ./nixPak.nix g-wrapper)).config.script;
+
+        gwp-wrapper = import ./photo-gimp-install-wrapper.nix {
+          inherit
+            pkgs
+            lib
+            photo-gimp-files
+            ;
+          gimp = gimp-with-plugins;
+        };
+
+        nixpak-wrapper-gwp = (mkNixPak (import ./nixPak.nix gwp-wrapper)).config.script;
       in
       {
         packages = {
           default = self.packages.${system}.photo-gimp;
-          photo-gimp =
-            let
-              script =
-                pkgs.writeScript "photogimp-gimp-nixpak-wrapper-script"
-                  # bash
-                  ''
-                    mkdir -p "$HOME/.config/PhotoGIMP"
-                    exec "$@"
-                  '';
-            in
-            pkgs.stdenv.mkDerivation {
-              name = "photogimp-gimp-nixpak-wrapper";
-              buildInputs = [ pkgs.makeWrapper ];
-
-              dontUnpack = true;
-
-              installPhase = ''
-                mkdir -p $out/{bin,share}
-                makeWrapper ${script} $out/bin/gimp \
-                  --add-flags ${lib.getExe nixpak-wrapper} \
-                  --set PATH ${
-                    lib.makeBinPath (
-                      with pkgs;
-                      [
-                        coreutils
-                        bash
-                      ]
-                    )
-                  }
-
-                cp -r ${photo-gimp-files}/.local/share/icons $out/share
-                install -D ${desktopItem}/share/applications/PhotoGIMP.desktop $out/share/applications/PhotoGIMP.desktop
-              '';
-
-              meta = {
-                mainProgram = "gimp";
-                platforms = [ system ];
-              };
-            };
+          photo-gimp = import ./package.nix {
+            inherit
+              pkgs
+              lib
+              photo-gimp-files
+              desktopItem
+              system
+              ;
+            nixpak-wrapper = nixpak-wrapper-g;
+          };
+          photo-gimp-with-plugins = import ./package.nix {
+            inherit
+              pkgs
+              lib
+              photo-gimp-files
+              desktopItem
+              system
+              ;
+            nixpak-wrapper = nixpak-wrapper-gwp;
+          };
         };
       }
     );
