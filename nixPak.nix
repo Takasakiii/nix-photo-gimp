@@ -36,6 +36,10 @@ toWrap: {
       locale.enable = true;
 
       bubblewrap = {
+        bind.ro = [
+          "/run/current-system/sw/share/X11/fonts"
+          "/etc/fonts"
+        ];
         bind.rw =
           let
             envSuffix = envKey: sloth.concat' (sloth.env envKey);
